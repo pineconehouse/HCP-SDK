@@ -1,0 +1,163 @@
+package com.hitachivantara.core.http;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+import org.apache.http.Consts;
+import org.apache.http.HttpEntity;
+import org.apache.http.HttpResponse;
+import org.apache.http.NameValuePair;
+import org.apache.http.client.entity.UrlEncodedFormEntity;
+import org.apache.http.client.methods.HttpDelete;
+import org.apache.http.client.methods.HttpEntityEnclosingRequestBase;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpHead;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.client.methods.HttpPut;
+import org.apache.http.client.methods.HttpRequestBase;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.message.BasicNameValuePair;
+
+import com.hitachivantara.core.http.model.RequestForm;
+import com.hitachivantara.core.http.model.RequestHeaders;
+import com.hitachivantara.core.http.model.RequestParams;
+import com.hitachivantara.core.http.model.RequestValue1;
+import com.hitachivantara.core.http.util.HttpUtils;
+import com.hitachivantara.core.http.util.URLUtils;
+
+public class SimpleHttpClient2 {
+	// private String protocol = null;
+	private final String encode;
+	private final RequestHeaders commonHeader = new RequestHeaders();
+	private final HttpClientBuilder httpClientBuilder;
+	// private ClientConfiguration configuration;
+
+	public SimpleHttpClient2(HttpClientBuilder httpClientBuilder) {
+		this.httpClientBuilder = httpClientBuilder;
+
+		// this.configuration = httpClientBuilder.getClientConfiguration();
+		// [scheme:][//authority][path][?query][#fragment]
+		// URI(String scheme, String authority, String path, String query, String fragment)
+		// this.protocol = configuration.getProtocol() != null ? (configuration.getProtocol() + "://") : "";
+		this.encode = httpClientBuilder.getClientConfiguration().getUrlEncode();
+	}
+
+	// protected abstract String redirect(String url) throws Exception;
+
+	public void addCommonHeader(String key, String value) {
+		commonHeader.put(key, value);
+	}
+
+	public HttpResponse post(String url, RequestHeaders header, RequestParams param, RequestForm form, HttpEntity entity) throws Exception {
+		url = URLUtils.catParams(url, param, encode);
+		HttpPost request = new HttpPost(url);
+		HttpResponse response = request(request, header, form, entity);
+		// request.releaseConnection();
+
+		return response;
+	}
+
+	public HttpResponse put(String url, RequestHeaders header, RequestParams param, HttpEntity entity) throws Exception {
+		url = URLUtils.catParams(url, param, encode);
+		HttpPut request = new HttpPut(url);
+		HttpResponse response = request(request, header, null, entity);
+		// request.releaseConnection();
+
+		return response;
+	}
+
+	public HttpResponse get(String url, RequestHeaders header, RequestParams param) throws Exception {
+		url = URLUtils.catParams(url, param, encode);
+		return request(new HttpGet(url), header);
+	}
+
+	public HttpResponse head(String url, RequestHeaders header, RequestParams param) throws Exception {
+		url = URLUtils.catParams(url, param, encode);
+		HttpHead request = new HttpHead(url);
+		HttpResponse response = request(request, header);
+		// request.releaseConnection();
+
+		return response;
+	}
+
+	public HttpResponse delete(String url, RequestHeaders header, RequestParams param) throws Exception {
+		HttpDelete request = new HttpDelete(url);
+		HttpResponse response = request(request, header);
+		// request.releaseConnection();
+
+		return response;
+	}
+
+	public HttpResponse request(HttpEntityEnclosingRequestBase req, RequestHeaders header, RequestForm form, HttpEntity entity) throws Exception {
+		// Set input stream
+		if (entity != null) {
+			req.setEntity(entity);
+		}
+
+		// Add form data
+		if (form != null && form.size() != 0) {
+			List<NameValuePair> formparams = new ArrayList<NameValuePair>();
+			for (Map.Entry<String, RequestValue1> entry : form.entrySet()) {
+				// Set form value
+				formparams.add(new BasicNameValuePair(entry.getKey(), entry.getValue().getValue()));
+			}
+			UrlEncodedFormEntity urlEncodedFormEntity = new UrlEncodedFormEntity(formparams, Consts.UTF_8);
+			req.setEntity(urlEncodedFormEntity);
+		}
+
+		return request(req, header);
+	}
+
+	public HttpResponse request(HttpRequestBase request, RequestHeaders header) throws Exception {
+		// if (url == null || url.length() == 0) {
+		// throw new MissParameterException("Request url must be specified.");
+		// }
+
+		CloseableHttpClient httpClient = null;
+		try {
+			httpClient = getHttpClient();
+
+			// Generate a new path based on the algorithm
+			// String newurl = protocol + URLUtils.urlEncode(url, encode);
+			// newurl = URLUtils.catParams(newurl, param, encode);
+			//
+			// // newurl
+			// request.setURI(URI.create(newurl));
+
+			// Set common header
+			if (commonHeader.size() != 0) {
+				for (Map.Entry<String, RequestValue1> entry : commonHeader.entrySet()) {
+					request.setHeader(entry.getKey(), entry.getValue().getValue());
+				}
+			}
+
+			// Set header
+			if (header != null && header.size() != 0) {
+				for (Map.Entry<String, RequestValue1> entry : header.entrySet()) {
+					request.setHeader(entry.getKey(), entry.getValue().getValue());
+				}
+			}
+
+			// v For Debug test
+//			HttpUtils.printHttpRequest(request);
+			// ^ For Debug test
+			// httpClient.execute(req, responseHandler)
+			HttpResponse httpResponse = httpClient.execute(request);
+			// vv For Debug test
+//			 HttpUtils.printHttpResponse(httpResponse, false);
+			// ^^ For Debug test
+
+			return httpResponse;
+		} finally {
+			if (httpClient != null) {
+				httpClient.close();
+			}
+		}
+	}
+
+	private CloseableHttpClient getHttpClient() {
+		CloseableHttpClient httpClient = httpClientBuilder.build();
+		return httpClient;
+	}
+}
